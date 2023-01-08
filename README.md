@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD034 -->
 # GFWProxyProtector
 
 به کمک این اسکریپت میتوانید ماژول xt_geoip را برای هسته ی لینوکس نصب و فعال کنید. این ماژول سیستم عامل را قادر به کنترل اتصالات شبکه بر اساس خصوصیات جغرافیایی می‌کند. با این روش دیگر اهمیتی ندارد از چه نرم افزار پروکسی یا وی پی ان بر روی سرور استفاده می‌کنید چون نهایتا تمام اتصالات توسط هسته و iptables بررسی خواهند شد.
@@ -14,6 +15,13 @@ iptables -A OUTPUT -m geoip --dst-cc IR -j DROP
 
 ```
 iptables -A INPUT -m geoip ! --src-cc IR -j DROP
+```
+
+## نحوه نصب
+
+‍‍```
+curl -sL https://raw.githubusercontent.com/0xLem0nade/GFWProxyProtector/main/activate-protection.sh | bash
+
 ```
 
 ## منابع
