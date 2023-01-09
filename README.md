@@ -19,10 +19,9 @@ iptables -A INPUT -m geoip ! --src-cc IR -j DROP
 
 ## نحوه نصب
 
-‍‍```
+`
 curl -sL https://raw.githubusercontent.com/0xLem0nade/GFWProxyProtector/main/activate-protection.sh | bash
-
-```
+`
 
 ## منابع
 
