@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Vars ###
-VERSION="1.0"
+VERSION="1.1"
 # Platform
 DISTRO="$(awk -F= '/^NAME/{print $2}' /etc/os-release)"
 DISTRO_VERSION=$(echo "$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release)" | tr -d '"')
@@ -18,14 +18,13 @@ if ! [[ "$DISTRO" =~ "Ubuntu" || "$DISTRO" =~ "Debian" ]]; then
     echo -e "${B_RED}This installer only supports Debian and Ubuntu OS!${RESET}"
     exit 0
 else
-    # Version check
     if [[ "$DISTRO" =~ "Ubuntu" ]]; then
-        if (($(echo "$DISTRO_VERSION < 20.04" | bc -l))); then
-            echo "Your version of Ubuntu is not supported! Minimum required version is 20.04"
+        if [ ! "$DISTRO_VERSION" == "20.04" ] || [ ! "$DISTRO_VERSION" == "22.04" ]; then
+            echo "Your version of Ubuntu is not supported! Only 20.04 and 22.04 versions are supported."
             exit 0
         fi
     elif [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
-        if (($(echo "$DISTRO_VERSION < 11" | bc -l))); then
+        if [ ! "$DISTRO_VERSION" == "11" ]; then
             echo "Your version of Debian is not supported! Minimum required version is 11"
             exit 0
         fi
@@ -54,13 +53,13 @@ function fn_block_outbound_connections_to_iran() {
 
     # Convert CSV database to binary format for xt_geoip
     if [[ "$DISTRO" =~ "Ubuntu" ]]; then
-        if (($(echo "$DISTRO_VERSION == 20.04" | bc -l))); then
+        if [ "$DISTRO_VERSION" == "20.04" ]; then
             sudo /usr/lib/xtables-addons/xt_geoip_build -D /usr/share/xt_geoip/ -S /usr/share/xt_geoip/
-        elif (($(echo "$DISTRO_VERSION == 22.04" | bc -l))); then
+        elif [ "$DISTRO_VERSION" == "22.04" ]; then
             sudo /usr/libexec/xtables-addons/xt_geoip_build -s -i /usr/share/xt_geoip/dbip-country-lite.csv.gz
         fi
     elif [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
-        if (($(echo "$DISTRO_VERSION == 11" | bc -l))); then
+        if [ "$DISTRO_VERSION" == "11" ]; then
             sudo /usr/libexec/xtables-addons/xt_geoip_build -s -i /usr/share/xt_geoip/dbip-country-lite.csv.gz
         fi
     fi
