@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ### Vars ###
-VERSION="1.1"
+VERSION="1.2"
 # Platform
 DISTRO="$(awk -F= '/^NAME/{print $2}' /etc/os-release)"
 DISTRO_VERSION=$(echo "$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release)" | tr -d '"')
@@ -19,8 +19,8 @@ if ! [[ "$DISTRO" =~ "Ubuntu" || "$DISTRO" =~ "Debian" ]]; then
     exit 0
 else
     if [[ "$DISTRO" =~ "Ubuntu" ]]; then
-        if [ ! "$DISTRO_VERSION" == "20.04" ] || [ ! "$DISTRO_VERSION" == "22.04" ]; then
-            echo "Your version of Ubuntu is not supported! Only 20.04 and 22.04 versions are supported."
+        if [ ! "$DISTRO_VERSION" == "22.04" ]; then
+            echo "Your version of Ubuntu is not supported! Only version 22.04 is supported."
             exit 0
         fi
     elif [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
@@ -50,21 +50,11 @@ function fn_block_outbound_connections_to_iran() {
     if [ ! -d "/usr/share/xt_geoip" ]; then
         sudo mkdir /usr/share/xt_geoip
     fi
-    sudo curl -s "https://download.db-ip.com/free/dbip-country-lite-${YR}-${MON}.csv.gz" >/usr/share/xt_geoip/dbip-country-lite.csv.gz
-    sudo gunzip /usr/share/xt_geoip/dbip-country-lite.csv.gz
+    sudo curl -s "https://download.db-ip.com/free/dbip-country-lite-${YR}-${MON}.csv.gz" >/usr/share/xt_geoip/dbip-country-lite-$YR-$MON.csv.gz
+    sudo gunzip /usr/share/xt_geoip/dbip-country-lite-$YR-$MON.csv.gz
 
     # Convert CSV database to binary format for xt_geoip
-    if [[ "$DISTRO" =~ "Ubuntu" ]]; then
-        if [ "$DISTRO_VERSION" == "20.04" ]; then
-            sudo /usr/lib/xtables-addons/xt_geoip_build -D /usr/share/xt_geoip/ -S /usr/share/xt_geoip/
-        elif [ "$DISTRO_VERSION" == "22.04" ]; then
-            sudo /usr/libexec/xtables-addons/xt_geoip_build -s -i /usr/share/xt_geoip/dbip-country-lite.csv.gz
-        fi
-    elif [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
-        if [ "$DISTRO_VERSION" == "11" ]; then
-            sudo /usr/libexec/xtables-addons/xt_geoip_build -s -i /usr/share/xt_geoip/dbip-country-lite.csv.gz
-        fi
-    fi
+    sudo /usr/libexec/xtables-addons/xt_geoip_build -s -i /usr/share/xt_geoip/dbip-country-lite-$YR-$MON.csv
 
     # Load xt_geoip kernel module
     modprobe xt_geoip
@@ -76,7 +66,7 @@ function fn_block_outbound_connections_to_iran() {
     # Save and cleanup
     sudo iptables-save | sudo tee /etc/iptables/rules.v4
     sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
-    sudo rm /usr/share/xt_geoip/dbip-country-lite.csv
+    sudo rm /usr/share/xt_geoip/dbip-country-lite-$YR-$MON.csv
 }
 
 function fn_enable_xtgeoip_cronjob() {
