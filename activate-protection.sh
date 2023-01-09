@@ -50,7 +50,7 @@ function fn_block_outbound_connections_to_iran() {
     if [ ! -d "/usr/share/xt_geoip" ]; then
         sudo mkdir /usr/share/xt_geoip
     fi
-    sudo wget "https://download.db-ip.com/free/dbip-country-lite-${YR}-${MON}.csv.gz" -O /usr/share/xt_geoip/dbip-country-lite.csv.gz
+    sudo curl -s "https://download.db-ip.com/free/dbip-country-lite-${YR}-${MON}.csv.gz" >/usr/share/xt_geoip/dbip-country-lite.csv.gz
     sudo gunzip /usr/share/xt_geoip/dbip-country-lite.csv.gz
 
     # Convert CSV database to binary format for xt_geoip
