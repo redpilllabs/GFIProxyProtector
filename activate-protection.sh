@@ -47,7 +47,9 @@ function fn_block_outbound_connections_to_iran() {
     # Download the latest GeoIP database
     MON=$(date +"%m")
     YR=$(date +"%Y")
-    sudo mkdir /usr/share/xt_geoip
+    if [ ! -d "/usr/share/xt_geoip" ]; then
+        sudo mkdir /usr/share/xt_geoip
+    fi
     sudo wget "https://download.db-ip.com/free/dbip-country-lite-${YR}-${MON}.csv.gz" -O /usr/share/xt_geoip/dbip-country-lite.csv.gz
     sudo gunzip /usr/share/xt_geoip/dbip-country-lite.csv.gz
 
