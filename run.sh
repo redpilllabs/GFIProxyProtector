@@ -203,7 +203,7 @@ function fn_update_iran_outbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep 'FORWARD -m geoip --destination-country IR  -j REJECT')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep 'FORWARD -m geoip --destination-country IR')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_IRAN_OUT_STATUS="ACTIVATED"
                 BLOCK_IRAN_OUT_STATUS_COLOR=$B_GREEN
@@ -351,13 +351,13 @@ Choose any option: "
     2)
         clear
         fn_toggle_china_blocking
-        clear
+        # clear
         mainmenu
         ;;
     1)
         clear
         fn_toggle_iran_outbound_blocking
-        clear
+        # clear
         mainmenu
         ;;
     0)
