@@ -161,8 +161,10 @@ function fn_block_outgoing_iran() {
         echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
         sleep 2
 
-        sudo iptables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-        sudo ip6tables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+        iptables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+        ip6tables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+        iptables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+        ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
         # Save and cleanup
         sudo iptables-save | sudo tee /etc/iptables/rules.v4
@@ -177,8 +179,10 @@ function fn_unblock_outgoing_iran() {
     echo -e "${B_GREEN}\n\nUnblocking OUTGOING connections to Iran ${RESET}"
     sleep 2
 
-    sudo iptables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-    sudo ip6tables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+    iptables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+    ip6tables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+    iptables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+    ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
     # Save and cleanup
     sudo iptables-save | sudo tee /etc/iptables/rules.v4
