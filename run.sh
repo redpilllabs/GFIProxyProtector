@@ -39,6 +39,12 @@ else
     fi
 fi
 
+# Root check
+if [ $(id -u) != 0 ]; then
+    echo "You need to run this script as the 'root' user!"
+    exit 0
+fi
+
 function fn_check_for_pkg() {
     if [ $(dpkg-query -W -f='${Status}' $1 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
         echo false
@@ -51,18 +57,18 @@ function fn_check_and_install_pkg() {
     local IS_INSTALLED=$(fn_check_for_pkg $1)
     if [ $IS_INSTALLED = false ]; then
         echo -e "${B_YELLOW}\n'$1' is missing! Installing now... ${RESET}"
-        sudo apt install -y $1
+        apt install -y $1
     fi
 }
 
 function fn_logrotate_kernel() {
     # Remove kern.log from rsyslog since we're going to modify its settings
-    sudo sed -i 's!/var/log/kern.log!!g' /etc/logrotate.d/rsyslog
-    sudo sed -i '/^\s*$/d' /etc/logrotate.d/rsyslog
+    sed -i 's!/var/log/kern.log!!g' /etc/logrotate.d/rsyslog
+    sed -i '/^\s*$/d' /etc/logrotate.d/rsyslog
 
     if [ ! -f "/etc/logrotate.d/kernel" ]; then
-        sudo touch /etc/logrotate.d/kernel
-        sudo sh -c 'echo "/var/log/kern.log
+        touch /etc/logrotate.d/kernel
+        sh -c 'echo "/var/log/kern.log
 {
 	size 20M
     rotate 5
@@ -92,24 +98,41 @@ function fn_install_xt_geoip_module() {
     fn_check_and_install_pkg curl
 
     # Copy our builder script
-    if [ ! -d "/usr/libexec/0xLem0nade" ]; then
-        sudo mkdir -p /usr/libexec/0xLem0nade
+    if [ ! -d "/usr/libexec/0xNeu" ]; then
+        mkdir -p /usr/libexec/0xNeu
     fi
-    sudo cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xLem0nade/xt_geoip_build_agg
-    sudo chmod +x /usr/libexec/0xLem0nade/xt_geoip_build_agg
+    cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
+    chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
 
     # Rotate kernel logs and limit them to max 100MB
     fn_logrotate_kernel
 
     # Add cronjob to keep the databased updated
-    sudo systemctl enable --now cron
+    systemctl enable --now cron
     if [ ! "$(cat /etc/crontab | grep xt_geoip_update)" ]; then
         echo -e "${B_GREEN}Adding cronjob to update xt_goip database \n  ${RESET}"
-        sudo cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/0xLem0nade/xt_geoip_update.sh
-        sudo chmod +x /usr/libexec/0xLem0nade/xt_geoip_update.sh
-        sudo touch /etc/crontab
+        cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/0xNeu/xt_geoip_update.sh
+        chmod +x /usr/libexec/0xNeu/xt_geoip_update.sh
+        touch /etc/crontab
         # Check for updates daily
-        echo "0 1 * * * root bash /usr/libexec/0xLem0nade/xt_geoip_update.sh >/tmp/xt_geoip_update.log" | sudo tee -a /etc/crontab >/dev/null
+        echo "0 1 * * * root bash /usr/libexec/0xNeu/xt_geoip_update.sh >/tmp/xt_geoip_update.log" | tee -a /etc/crontab >/dev/null
+    fi
+}
+
+function fn_increase_connctrack_limit() {
+    local MEM=$(free | awk '/^Mem:/{print $2}' | awk '{print $1*1000}')
+    local CONNTRACK_MAX=$(awk "BEGIN {print $MEM / 16384 / 2}")
+    if [ "$(sysctl -n net.netfilter.nf_conntrack_max)" -ne "$CONNTRACK_MAX" ]; then
+        if [ ! -d "/etc/sysctl.d" ]; then
+            sudo mkdir -p /etc/sysctl.d
+        fi
+        if [ ! -f "/etc/sysctl.d/99-x-firewall.conf" ]; then
+            echo -e "${GREEN}Increasing Connection State Tracking Limits ${RESET}"
+            sudo touch /etc/sysctl.d/99-x-firewall.conf
+            echo "net.netfilter.nf_conntrack_max=$CONNTRACK_MAX" | sudo tee -a /etc/sysctl.d/99-x-firewall.conf
+            sudo sysctl -p /etc/sysctl.d/99-x-firewall.conf
+            echo -e "${B_GREEN}<<< Finished kernel tuning! >>> ${RESET}"
+        fi
     fi
 }
 
@@ -123,25 +146,25 @@ function fn_rebuild_xt_geoip_database() {
             if [ ! -f "/usr/share/xt_geoip/${item}.iv4" ]; then
                 # Download the latest aggegated GeoIP database
                 echo -e "${B_GREEN}xt_geoip database needes rebuilding! Downloading the latest aggregated CIDR .csv file ${RESET}"
-                if [ ! -d "/usr/libexec/0xLem0nade/" ]; then
-                    sudo mkdir -p /usr/libexec/0xLem0nade
+                if [ ! -d "/usr/libexec/0xNeu/" ]; then
+                    mkdir -p /usr/libexec/0xNeu
                 fi
-                curl "https://raw.githubusercontent.com/0xLem0nade/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
-                sudo mv /tmp/agg_cidrs.csv /usr/libexec/0xLem0nade/agg_cidrs.csv
+                curl "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+                mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
 
                 # Copy our builder script if coming from a previous version
-                if [ ! -f "/usr/libexec/0xLem0nade/xt_geoip_build_agg" ]; then
-                    sudo mkdir -p /usr/libexec/0xLem0nade
+                if [ ! -f "/usr/libexec/0xNeu/xt_geoip_build_agg" ]; then
+                    mkdir -p /usr/libexec/0xNeu
                 fi
-                sudo cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xLem0nade/xt_geoip_build_agg
-                sudo chmod +x /usr/libexec/0xLem0nade/xt_geoip_build_agg
+                cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
+                chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
 
                 # Convert CSV database to binary format for xt_geoip
                 echo -e "${B_GREEN}Converting to binary for xt_geoip kernel module utilization ${RESET}"
                 if [ ! -d "/usr/share/xt_geoip" ]; then
-                    sudo mkdir -p /usr/share/xt_geoip
+                    mkdir -p /usr/share/xt_geoip
                 fi
-                sudo /usr/libexec/0xLem0nade/xt_geoip_build_agg -s -i /usr/libexec/0xLem0nade/agg_cidrs.csv
+                /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
 
                 # Load the xt_geoip kernel module
                 modprobe xt_geoip
@@ -155,7 +178,7 @@ function fn_rebuild_xt_geoip_database() {
 }
 
 function fn_block_outgoing_iran() {
-    sudo modprobe xt_geoip
+    modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
@@ -167,8 +190,8 @@ function fn_block_outgoing_iran() {
         ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
         # Save and cleanup
-        sudo iptables-save | sudo tee /etc/iptables/rules.v4
-        sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+        iptables-save | tee /etc/iptables/rules.v4
+        ip6tables-save | tee /etc/iptables/rules.v6
     else
         echo -e "${B_YELLOW}\n\nNOTICE: xt_geoip module is missing! Reinstalling now, please wait... ${RESET}"
         fn_install_xt_geoip_module
@@ -185,8 +208,8 @@ function fn_unblock_outgoing_iran() {
     ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
     # Save and cleanup
-    sudo iptables-save | sudo tee /etc/iptables/rules.v4
-    sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+    iptables-save | tee /etc/iptables/rules.v4
+    ip6tables-save | tee /etc/iptables/rules.v6
 }
 
 function fn_toggle_iran_outbound_blocking() {
@@ -196,6 +219,7 @@ function fn_toggle_iran_outbound_blocking() {
         if [ "$IS_INSTALLED" = false ]; then
             fn_install_xt_geoip_module
         fi
+        fn_increase_connctrack_limit
         fn_rebuild_xt_geoip_database
         fn_block_outgoing_iran
     else
@@ -207,7 +231,7 @@ function fn_update_iran_outbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep 'FORWARD -m geoip --destination-country IR')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e '-m geoip --destination-country IR')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_IRAN_OUT_STATUS="ACTIVATED"
                 BLOCK_IRAN_OUT_STATUS_COLOR=$B_GREEN
@@ -226,28 +250,28 @@ function fn_update_iran_outbound_blocking_status() {
 }
 
 function fn_block_china_in_out() {
-    sudo modprobe xt_geoip
+    modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking connections to/from China ${RESET}"
         sleep 2
 
         # Drop connections to/from China
-        sudo iptables -I INPUT -m geoip --src-cc CN -j DROP
-        sudo ip6tables -I INPUT -m geoip --src-cc CN -j DROP
-        sudo iptables -I FORWARD -m geoip --src-cc CN -j REJECT
-        sudo ip6tables -I FORWARD -m geoip --src-cc CN -j REJECT
-        sudo iptables -I FORWARD -m geoip --dst-cc CN -j REJECT
-        sudo ip6tables -I FORWARD -m geoip --dst-cc CN -j REJECT
-        sudo iptables -I OUTPUT -m geoip --dst-cc CN -j REJECT
-        sudo ip6tables -I OUTPUT -m geoip --dst-cc CN -j REJECT
+        iptables -I INPUT -m geoip --src-cc CN -j DROP
+        ip6tables -I INPUT -m geoip --src-cc CN -j DROP
+        iptables -I FORWARD -m geoip --src-cc CN -j REJECT
+        ip6tables -I FORWARD -m geoip --src-cc CN -j REJECT
+        iptables -I FORWARD -m geoip --dst-cc CN -j REJECT
+        ip6tables -I FORWARD -m geoip --dst-cc CN -j REJECT
+        iptables -I OUTPUT -m geoip --dst-cc CN -j REJECT
+        ip6tables -I OUTPUT -m geoip --dst-cc CN -j REJECT
         # Log any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-        sudo iptables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix '** GFW **'
-        sudo ip6tables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix '** GFW **'
+        iptables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
+        ip6tables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
 
         # Save and cleanup
-        sudo iptables-save | sudo tee /etc/iptables/rules.v4
-        sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+        iptables-save | tee /etc/iptables/rules.v4
+        ip6tables-save | tee /etc/iptables/rules.v6
     else
         echo -e "${B_YELLOW}\n\nNOTICE: xt_geoip module is missing! Reinstalling now, please wait... ${RESET}"
         fn_install_xt_geoip_module
@@ -259,21 +283,21 @@ function fn_unblock_china_in_out() {
     sleep 2
 
     # Disable logs from any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-    sudo iptables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix '** GFW **'
-    sudo ip6tables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix '** GFW **'
+    iptables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
+    ip6tables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
     # Allow connections to/from China
-    sudo iptables -D INPUT -m geoip --src-cc CN -j DROP
-    sudo ip6tables -D INPUT -m geoip --src-cc CN -j DROP
-    sudo iptables -D FORWARD -m geoip --src-cc CN -j REJECT
-    sudo ip6tables -D FORWARD -m geoip --src-cc CN -j REJECT
-    sudo iptables -D FORWARD -m geoip --dst-cc CN -j REJECT
-    sudo ip6tables -D FORWARD -m geoip --dst-cc CN -j REJECT
-    sudo iptables -D OUTPUT -m geoip --dst-cc CN -j REJECT
-    sudo ip6tables -D OUTPUT -m geoip --dst-cc CN -j REJECT
+    iptables -D INPUT -m geoip --src-cc CN -j DROP
+    ip6tables -D INPUT -m geoip --src-cc CN -j DROP
+    iptables -D FORWARD -m geoip --src-cc CN -j REJECT
+    ip6tables -D FORWARD -m geoip --src-cc CN -j REJECT
+    iptables -D FORWARD -m geoip --dst-cc CN -j REJECT
+    ip6tables -D FORWARD -m geoip --dst-cc CN -j REJECT
+    iptables -D OUTPUT -m geoip --dst-cc CN -j REJECT
+    ip6tables -D OUTPUT -m geoip --dst-cc CN -j REJECT
 
     # Save and cleanup
-    sudo iptables-save | sudo tee /etc/iptables/rules.v4
-    sudo ip6tables-save | sudo tee /etc/iptables/rules.v6
+    iptables-save | tee /etc/iptables/rules.v4
+    ip6tables-save | tee /etc/iptables/rules.v6
 }
 
 function fn_toggle_china_blocking() {
@@ -283,6 +307,7 @@ function fn_toggle_china_blocking() {
         if [ "$IS_INSTALLED" = false ]; then
             fn_install_xt_geoip_module
         fi
+        fn_increase_connctrack_limit
         fn_rebuild_xt_geoip_database
         fn_block_china_in_out
     else
@@ -294,7 +319,7 @@ function fn_update_china_in_out_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep 'INPUT -m geoip --source-country CN  -j DROP')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e '-m geoip --source-country CN  -j DROP')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_CHINA_IN_OUT_STATUS="ACTIVATED"
                 BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_GREEN
@@ -326,12 +351,12 @@ function fn_print_header() {
     #############################################################
     #                                                           #
     #                GFW Proxy Server Protection                #
-    #                    Author: 0xLem0nade                     #
+    #                       Author: 0xNeu                       #
     #                                                           #
     #      This is a subset of 'Rainbow Proxy Installer'        #
-    #      available at [github.com/0xLem0nade/Rainbow]         #
-    #       and it utilizes the aggregated CIDR databse         #
-    #      available at [github.com/0xLem0nade/GFIGeoIP]        #
+    #        available at [github.com/0xNeu/Rainbow]            #
+    #      and it utilizes the aggregated CIDR database         #
+    #        available at [github.com/0xNeu/GFIGeoIP]           #
     #                                                           #
     #############################################################
     "
