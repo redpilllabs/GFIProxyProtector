@@ -122,6 +122,7 @@ function fn_install_xt_geoip_module() {
 function fn_increase_connctrack_limit() {
     local MEM=$(free | awk '/^Mem:/{print $2}' | awk '{print $1*1000}')
     local CONNTRACK_MAX=$(awk "BEGIN {print $MEM / 16384 / 2}")
+    local CONNTRACK_MAX=$(bc <<<"scale=0; $CONNTRACK_MAX/1")
     if [ "$(sysctl -n net.netfilter.nf_conntrack_max)" -ne "$CONNTRACK_MAX" ]; then
         if [ ! -d "/etc/sysctl.d" ]; then
             sudo mkdir -p /etc/sysctl.d
