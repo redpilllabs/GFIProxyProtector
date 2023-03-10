@@ -125,13 +125,13 @@ function fn_increase_connctrack_limit() {
     local CONNTRACK_MAX=$(bc <<<"scale=0; $CONNTRACK_MAX/1")
     if [ "$(sysctl -n net.netfilter.nf_conntrack_max)" -ne "$CONNTRACK_MAX" ]; then
         if [ ! -d "/etc/sysctl.d" ]; then
-            sudo mkdir -p /etc/sysctl.d
+            mkdir -p /etc/sysctl.d
         fi
         if [ ! -f "/etc/sysctl.d/99-x-firewall.conf" ]; then
             echo -e "${GREEN}Increasing Connection State Tracking Limits ${RESET}"
-            sudo touch /etc/sysctl.d/99-x-firewall.conf
-            echo "net.netfilter.nf_conntrack_max=$CONNTRACK_MAX" | sudo tee -a /etc/sysctl.d/99-x-firewall.conf
-            sudo sysctl -p /etc/sysctl.d/99-x-firewall.conf
+            touch /etc/sysctl.d/99-x-firewall.conf
+            echo "net.netfilter.nf_conntrack_max=$CONNTRACK_MAX" | tee -a /etc/sysctl.d/99-x-firewall.conf
+            sysctl -p /etc/sysctl.d/99-x-firewall.conf
             echo -e "${B_GREEN}<<< Finished kernel tuning! >>> ${RESET}"
         fi
     fi
