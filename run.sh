@@ -40,9 +40,9 @@ else
 fi
 
 # Root check
-if [ $(id -u) != 0 ]; then
-    echo "You need to run this script as the 'root' user!"
-    exit 0
+if [ "$EUID" -ne 0 ]; then
+    echo "Please run as root (sudo ./run.sh)"
+    exit
 fi
 
 function fn_check_for_pkg() {
@@ -141,38 +141,45 @@ function fn_rebuild_xt_geoip_database() {
     if [ "$(fn_check_for_pkg xtables-addons-common)" = true ] &&
         [ "$(fn_check_for_pkg libtext-csv-xs-perl)" = true ]; then
 
-        # Add new entries in case of updates
-        local XT_GEOIP_CODES=(IR CN)
-        for item in ${XT_GEOIP_CODES[@]}; do
-            if [ ! -f "/usr/share/xt_geoip/${item}.iv4" ]; then
-                # Download the latest aggegated GeoIP database
-                echo -e "${B_GREEN}xt_geoip database needes rebuilding! Downloading the latest aggregated CIDR .csv file ${RESET}"
-                if [ ! -d "/usr/libexec/0xNeu/" ]; then
-                    mkdir -p /usr/libexec/0xNeu
-                fi
-                curl "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+        if [ ! -d "/usr/libexec/0xNeu/" ]; then
+            mkdir -p /usr/libexec/0xNeu
+        fi
+        if [ ! -d "/usr/share/xt_geoip" ]; then
+            mkdir -p /usr/share/xt_geoip
+        fi
+        # Copy our builder script if coming from a previous version
+        cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
+        chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
+
+        # Get the latest aggregated CIDR database
+        curl -s "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+
+        # Check if it's the first run
+        if [ -f "/usr/libexec/0xNeu/agg_cidr.csv" ]; then
+            # Check if it is newer than what we already have
+            OLD_SIZE=$(wc -c </usr/libexec/0xNeu/agg_cidr.csv)
+            NEW_SIZE=$(wc -c </tmp/agg_cidrs.csv)
+            if [ "$OLD_SIZE" != "$NEW_SIZE" ]; then
                 mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
-
-                # Copy our builder script if coming from a previous version
-                if [ ! -f "/usr/libexec/0xNeu/xt_geoip_build_agg" ]; then
-                    mkdir -p /usr/libexec/0xNeu
-                fi
-                cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
-                chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
-
                 # Convert CSV database to binary format for xt_geoip
-                echo -e "${B_GREEN}Converting to binary for xt_geoip kernel module utilization ${RESET}"
-                if [ ! -d "/usr/share/xt_geoip" ]; then
-                    mkdir -p /usr/share/xt_geoip
-                fi
+                echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
                 /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
-
-                # Load the xt_geoip kernel module
+                # Load xt_geoip kernel module
                 modprobe xt_geoip
                 lsmod | grep ^xt_geoip
-                break
+            else
+                echo -e "${B_GREEN}Already on the latest database! ${RESET}"
+                rm /tmp/agg_cidrs.csv
             fi
-        done
+        else
+            mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
+            # Convert CSV database to binary format for xt_geoip
+            echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
+            /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
+            # Load xt_geoip kernel module
+            modprobe xt_geoip
+            lsmod | grep ^xt_geoip
+        fi
     else
         fn_install_xt_geoip_module
     fi
