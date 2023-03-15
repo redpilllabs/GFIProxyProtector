@@ -172,7 +172,7 @@ function fn_rebuild_xt_geoip_database() {
                 echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
                 /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
                 # Load xt_geoip kernel module
-                modprobe xt_geoip
+                sudo modprobe xt_geoip
                 lsmod | grep ^xt_geoip
             else
                 echo -e "${B_GREEN}Already on the latest database! ${RESET}"
@@ -184,7 +184,7 @@ function fn_rebuild_xt_geoip_database() {
             echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
             /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
             # Load xt_geoip kernel module
-            modprobe xt_geoip
+            sudo modprobe xt_geoip
             lsmod | grep ^xt_geoip
         fi
     else
@@ -193,7 +193,7 @@ function fn_rebuild_xt_geoip_database() {
 }
 
 function fn_block_outgoing_iran() {
-    modprobe xt_geoip
+    sudo modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
@@ -265,7 +265,7 @@ function fn_update_iran_outbound_blocking_status() {
 }
 
 function fn_block_china_in_out() {
-    modprobe xt_geoip
+    sudo modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking connections to/from China ${RESET}"
