@@ -61,6 +61,13 @@ function fn_check_and_install_pkg() {
     fi
 }
 
+# Install pre-requisites
+echo -e "${B_GREEN}Checking for pre-required packages${RESET}"
+pkgs=("kmod" "dialog" "apt-utils" "procps" "bc" "logrotate")
+for pkg in ${pkgs[@]}; do
+    fn_check_and_install_pkg "$pkg"
+done
+
 function fn_logrotate_kernel() {
     # Remove kern.log from rsyslog since we're going to modify its settings
     sed -i 's!/var/log/kern.log!!g' /etc/logrotate.d/rsyslog
