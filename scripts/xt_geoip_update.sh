@@ -8,10 +8,10 @@ if [ "$(lsmod | grep ^xt_geoip)" ]; then
         echo -e "${B_GREEN}Already on the latest database! ${RESET}"
         rm /tmp/agg_cidrs.csv
     else
-        mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
+        sudo mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
         # Convert CSV database to binary format for xt_geoip
         echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
-        /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
+        sudo /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
         # Load xt_geoip kernel module
         sudo modprobe xt_geoip
         lsmod | grep ^xt_geoip

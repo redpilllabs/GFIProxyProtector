@@ -120,9 +120,11 @@ function fn_install_xt_geoip_module() {
         echo -e "${B_GREEN}Adding cronjob to update xt_goip database \n  ${RESET}"
         cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/0xNeu/xt_geoip_update.sh
         chmod +x /usr/libexec/0xNeu/xt_geoip_update.sh
-        touch /etc/crontab
         # Check for updates daily
-        echo "0 1 * * * root bash /usr/libexec/0xNeu/xt_geoip_update.sh >/tmp/xt_geoip_update.log" | tee -a /etc/crontab >/dev/null
+        sudo crontab -l | {
+            cat
+            echo "0 1 * * * root bash /usr/libexec/0xNeu/xt_geoip_update.sh >/tmp/xt_geoip_update.log"
+        } | sudo crontab -
     fi
 }
 
