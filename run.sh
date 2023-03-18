@@ -105,11 +105,11 @@ function fn_install_xt_geoip_module() {
     fn_check_and_install_pkg curl
 
     # Copy our builder script
-    if [ ! -d "/usr/libexec/0xNeu" ]; then
-        mkdir -p /usr/libexec/0xNeu
+    if [ ! -d "/usr/libexec/rainbow" ]; then
+        mkdir -p /usr/libexec/rainbow
     fi
-    cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
-    chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
+    cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/rainbow/xt_geoip_build_agg
+    chmod +x /usr/libexec/rainbow/xt_geoip_build_agg
 
     # Rotate kernel logs and limit them to max 100MB
     fn_logrotate_kernel
@@ -118,12 +118,12 @@ function fn_install_xt_geoip_module() {
     systemctl enable --now cron
     if [ ! "$(cat /etc/crontab | grep xt_geoip_update)" ]; then
         echo -e "${B_GREEN}Adding cronjob to update xt_goip database \n  ${RESET}"
-        cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/0xNeu/xt_geoip_update.sh
-        chmod +x /usr/libexec/0xNeu/xt_geoip_update.sh
+        cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/rainbow/xt_geoip_update.sh
+        chmod +x /usr/libexec/rainbow/xt_geoip_update.sh
         # Check for updates daily
         sudo crontab -l | {
             cat
-            echo "0 1 * * * root bash /usr/libexec/0xNeu/xt_geoip_update.sh >/tmp/xt_geoip_update.log"
+            echo "0 1 * * * root bash /usr/libexec/rainbow/xt_geoip_update.sh >/tmp/xt_geoip_update.log"
         } | sudo crontab -
     fi
 }
@@ -150,40 +150,40 @@ function fn_rebuild_xt_geoip_database() {
     if [ "$(fn_check_for_pkg xtables-addons-common)" = true ] &&
         [ "$(fn_check_for_pkg libtext-csv-xs-perl)" = true ]; then
 
-        if [ ! -d "/usr/libexec/0xNeu/" ]; then
-            mkdir -p /usr/libexec/0xNeu
+        if [ ! -d "/usr/libexec/rainbow/" ]; then
+            mkdir -p /usr/libexec/rainbow
         fi
         if [ ! -d "/usr/share/xt_geoip" ]; then
             mkdir -p /usr/share/xt_geoip
         fi
         # Copy our builder script if coming from a previous version
-        cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/0xNeu/xt_geoip_build_agg
-        chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
+        cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/rainbow/xt_geoip_build_agg
+        chmod +x /usr/libexec/rainbow/xt_geoip_build_agg
 
         # Get the latest aggregated CIDR database
         echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
         curl -s "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
 
         # Check if it's the first run
-        if [ -f "/usr/libexec/0xNeu/agg_cidr.csv" ]; then
+        if [ -f "/usr/libexec/rainbow/agg_cidr.csv" ]; then
             # Check if it is newer than what we already have
-            if cmp -s /usr/libexec/0xNeu/agg_cidr.csv /tmp/agg_cidrs.csv; then
+            if cmp -s /usr/libexec/rainbow/agg_cidr.csv /tmp/agg_cidrs.csv; then
                 echo -e "${B_GREEN}Already on the latest database! ${RESET}"
                 rm /tmp/agg_cidrs.csv
             else
-                mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
+                mv /tmp/agg_cidrs.csv /usr/libexec/rainbow/agg_cidrs.csv
                 # Convert CSV database to binary format for xt_geoip
                 echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
-                /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
+                /usr/libexec/rainbow/xt_geoip_build_agg -s -i /usr/libexec/rainbow/agg_cidrs.csv
                 # Load xt_geoip kernel module
                 sudo modprobe xt_geoip
                 lsmod | grep ^xt_geoip
             fi
         else
-            mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
+            mv /tmp/agg_cidrs.csv /usr/libexec/rainbow/agg_cidrs.csv
             # Convert CSV database to binary format for xt_geoip
             echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
-            /usr/libexec/0xNeu/xt_geoip_build_agg -s -i /usr/libexec/0xNeu/agg_cidrs.csv
+            /usr/libexec/rainbow/xt_geoip_build_agg -s -i /usr/libexec/rainbow/agg_cidrs.csv
             # Load xt_geoip kernel module
             sudo modprobe xt_geoip
             lsmod | grep ^xt_geoip
