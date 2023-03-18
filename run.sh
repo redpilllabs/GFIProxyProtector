@@ -159,14 +159,16 @@ function fn_rebuild_xt_geoip_database() {
         chmod +x /usr/libexec/0xNeu/xt_geoip_build_agg
 
         # Get the latest aggregated CIDR database
+        echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
         curl -s "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
 
         # Check if it's the first run
         if [ -f "/usr/libexec/0xNeu/agg_cidr.csv" ]; then
             # Check if it is newer than what we already have
-            OLD_SIZE=$(wc -c </usr/libexec/0xNeu/agg_cidr.csv)
-            NEW_SIZE=$(wc -c </tmp/agg_cidrs.csv)
-            if [ "$OLD_SIZE" != "$NEW_SIZE" ]; then
+            if cmp -s /usr/libexec/0xNeu/agg_cidr.csv /tmp/agg_cidrs.csv; then
+                echo -e "${B_GREEN}Already on the latest database! ${RESET}"
+                rm /tmp/agg_cidrs.csv
+            else
                 mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
                 # Convert CSV database to binary format for xt_geoip
                 echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
@@ -174,9 +176,6 @@ function fn_rebuild_xt_geoip_database() {
                 # Load xt_geoip kernel module
                 sudo modprobe xt_geoip
                 lsmod | grep ^xt_geoip
-            else
-                echo -e "${B_GREEN}Already on the latest database! ${RESET}"
-                rm /tmp/agg_cidrs.csv
             fi
         else
             mv /tmp/agg_cidrs.csv /usr/libexec/0xNeu/agg_cidrs.csv
