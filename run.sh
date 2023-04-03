@@ -240,8 +240,8 @@ function fn_block_outgoing_iran() {
         ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
         # Save and cleanup
-        iptables-save | tee /etc/iptables/rules.v4
-        ip6tables-save | tee /etc/iptables/rules.v6
+        iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
     else
         fn_install_xt_geoip_module
     fi
@@ -257,8 +257,8 @@ function fn_unblock_outgoing_iran() {
     ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
 
     # Save and cleanup
-    iptables-save | tee /etc/iptables/rules.v4
-    ip6tables-save | tee /etc/iptables/rules.v6
+    iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+    ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
 }
 
 function fn_toggle_iran_outbound_blocking() {
@@ -319,8 +319,8 @@ function fn_block_china_in_out() {
         ip6tables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
 
         # Save and cleanup
-        iptables-save | tee /etc/iptables/rules.v4
-        ip6tables-save | tee /etc/iptables/rules.v6
+        iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
     else
         fn_install_xt_geoip_module
     fi
@@ -344,8 +344,8 @@ function fn_unblock_china_in_out() {
     ip6tables -D OUTPUT -m geoip --dst-cc CN -j REJECT
 
     # Save and cleanup
-    iptables-save | tee /etc/iptables/rules.v4
-    ip6tables-save | tee /etc/iptables/rules.v6
+    iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+    ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
 }
 
 function fn_toggle_china_blocking() {
