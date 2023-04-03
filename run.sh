@@ -315,8 +315,8 @@ function fn_block_china_in_out() {
         iptables -I OUTPUT -m geoip --dst-cc CN -j REJECT
         ip6tables -I OUTPUT -m geoip --dst-cc CN -j REJECT
         # Log any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-        iptables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
-        ip6tables -I INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
+        iptables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+        ip6tables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
 
         # Save and cleanup
         iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -331,8 +331,8 @@ function fn_unblock_china_in_out() {
     sleep 2
 
     # Disable logs from any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-    iptables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
-    ip6tables -D INPUT -m geoip --src-cc CN -j LOG --log-prefix ' ** GFW ** '
+    iptables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+    ip6tables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
     # Allow connections to/from China
     iptables -D INPUT -m geoip --src-cc CN -j DROP
     ip6tables -D INPUT -m geoip --src-cc CN -j DROP
