@@ -56,7 +56,7 @@ function fn_check_for_pkg() {
 function fn_check_and_install_pkg() {
     local IS_INSTALLED=$(fn_check_for_pkg $1)
     if [ $IS_INSTALLED = false ]; then
-        echo -e "${B_YELLOW}\n'$1' is missing! Installing now... ${RESET}"
+        echo -e "${B_GREEN}\nInstalling '$1'... ${RESET}"
         apt install -y $1
     fi
 }
@@ -209,7 +209,6 @@ function fn_block_outgoing_iran() {
         iptables-save | tee /etc/iptables/rules.v4
         ip6tables-save | tee /etc/iptables/rules.v6
     else
-        echo -e "${B_YELLOW}\n\nNOTICE: xt_geoip module is missing! Reinstalling now, please wait... ${RESET}"
         fn_install_xt_geoip_module
     fi
 }
@@ -289,7 +288,6 @@ function fn_block_china_in_out() {
         iptables-save | tee /etc/iptables/rules.v4
         ip6tables-save | tee /etc/iptables/rules.v6
     else
-        echo -e "${B_YELLOW}\n\nNOTICE: xt_geoip module is missing! Reinstalling now, please wait... ${RESET}"
         fn_install_xt_geoip_module
     fi
 }
