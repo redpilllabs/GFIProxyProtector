@@ -147,15 +147,18 @@ function fn_install_xt_geoip_module() {
 
     # Add cronjob to keep the databased updated
     systemctl enable --now cron
-    if [ ! "$(cat /etc/crontab | grep xt_geoip_update)" ]; then
+    if [ ! -f "/etc/crontab" ]; then
+        touch /etc/crontab
+    fi
+    if ! crontab -l | grep -q "0 1 * * * root bash /usr/libexec/rainbow/xt_geoip_update.sh >/tmp/xt_geoip_update.log"; then
         echo -e "${B_GREEN}Adding cronjob to update xt_goip database \n  ${RESET}"
         cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/rainbow/xt_geoip_update.sh
         chmod +x /usr/libexec/rainbow/xt_geoip_update.sh
         # Check for updates daily
-        crontab -l | {
-            cat
+        (
+            crontab -l
             echo "0 1 * * * root bash /usr/libexec/rainbow/xt_geoip_update.sh >/tmp/xt_geoip_update.log"
-        } | crontab -
+        ) | crontab -
     fi
 }
 
