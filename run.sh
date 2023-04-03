@@ -61,12 +61,21 @@ function fn_check_and_install_pkg() {
     fi
 }
 
-# Install pre-requisites
-echo -e "${B_GREEN}Checking for pre-required packages${RESET}"
-pkgs=("kmod" "dialog" "apt-utils" "procps" "bc" "logrotate")
-for pkg in ${pkgs[@]}; do
-    fn_check_and_install_pkg "$pkg"
-done
+function fn_update_os() {
+    # Update the APT cache and installed packages
+    echo -e "${B_GREEN}Updating APT cache and OS packages${RESET}"
+    apt-get update
+    apt-get upgrade -y
+}
+
+function fn_install_required_packages() {
+    # Install pre-requisites
+    echo -e "${B_GREEN}Checking for pre-required packages${RESET}"
+    pkgs=("kmod" "dialog" "apt-utils" "procps" "bc" "logrotate")
+    for pkg in ${pkgs[@]}; do
+        fn_check_and_install_pkg "$pkg"
+    done
+}
 
 function fn_logrotate_kernel() {
     # Remove kern.log from rsyslog since we're going to modify its settings
@@ -95,6 +104,7 @@ function fn_logrotate_kernel() {
 function fn_install_xt_geoip_module() {
     trap - INT
     echo -e "${B_GREEN}Installing xt_geoip module ${RESET}"
+    fn_check_and_install_pkg linux-headers-$(uname -r)
     fn_check_and_install_pkg xtables-addons-dkms
     fn_check_and_install_pkg xtables-addons-common
     fn_check_and_install_pkg libtext-csv-xs-perl
@@ -121,10 +131,10 @@ function fn_install_xt_geoip_module() {
         cp $PWD/scripts/xt_geoip_update.sh /usr/libexec/rainbow/xt_geoip_update.sh
         chmod +x /usr/libexec/rainbow/xt_geoip_update.sh
         # Check for updates daily
-        sudo crontab -l | {
+        crontab -l | {
             cat
             echo "0 1 * * * root bash /usr/libexec/rainbow/xt_geoip_update.sh >/tmp/xt_geoip_update.log"
-        } | sudo crontab -
+        } | crontab -
     fi
 }
 
@@ -176,7 +186,7 @@ function fn_rebuild_xt_geoip_database() {
                 echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
                 /usr/libexec/rainbow/xt_geoip_build_agg -s -i /usr/libexec/rainbow/agg_cidrs.csv
                 # Load xt_geoip kernel module
-                sudo modprobe xt_geoip
+                modprobe xt_geoip
                 lsmod | grep ^xt_geoip
             fi
         else
@@ -185,7 +195,7 @@ function fn_rebuild_xt_geoip_database() {
             echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
             /usr/libexec/rainbow/xt_geoip_build_agg -s -i /usr/libexec/rainbow/agg_cidrs.csv
             # Load xt_geoip kernel module
-            sudo modprobe xt_geoip
+            modprobe xt_geoip
             lsmod | grep ^xt_geoip
         fi
     else
@@ -194,7 +204,7 @@ function fn_rebuild_xt_geoip_database() {
 }
 
 function fn_block_outgoing_iran() {
-    sudo modprobe xt_geoip
+    modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
@@ -265,7 +275,7 @@ function fn_update_iran_outbound_blocking_status() {
 }
 
 function fn_block_china_in_out() {
-    sudo modprobe xt_geoip
+    modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         echo -e "${B_GREEN}\n\nBlocking connections to/from China ${RESET}"
@@ -414,4 +424,6 @@ Choose any option: "
     esac
 }
 
+fn_update_os
+fn_install_required_packages
 mainmenu
