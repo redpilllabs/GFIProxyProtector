@@ -87,8 +87,9 @@ function fn_check_for_newer_kernel() {
                 echo -e "${B_YELLOW}\n\nThere's a newer kernel available for your OS: $available_kernel${RESET}"
                 fn_install_required_packages linux-image-amd64
                 fn_install_required_packages linux-headers-amd64
-                echo -e "${B_RED}You need to reboot your server to load the new kernel and the extra moduels required${RESET}"
+                echo -e "${B_RED}You're server is now going to reboot to load the new kernel and the extra moduels required${RESET}"
                 echo -e "${B_GREEN}After booting up, run the script again to proceed!${RESET}"
+                systemctl reboot
                 exit
             fi
         done
