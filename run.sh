@@ -77,6 +77,25 @@ function fn_install_required_packages() {
     done
 }
 
+function fn_check_for_newer_kernel() {
+    if [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
+        kernel_version=$(uname -r)
+        available_kernels=$(apt-cache search linux-image | grep -oP '[0-9]\.[0-9]+\.[0-9]+-[0-9]+')
+        for available_kernel in $available_kernels; do
+            if [[ "$available_kernel" > "$kernel_version" ]]; then
+                echo -e "${B_YELLOW}There's a newer kernel available: $available_kernel${RESET}"
+                fn_install_required_packages linux-image-amd64
+                fn_install_required_packages linux-headers-amd64
+                echo -e "${B_RED}You need to reboot your server to load the new kernel and the extra moduels required${RESET}"
+                echo -e "${B_GREEN}After booting up, run the script again to proceed!${RESET}"
+                exit
+            fi
+        done
+        fn_install_required_packages linux-image-amd64
+        fn_install_required_packages linux-headers-amd64
+    fi
+}
+
 function fn_logrotate_kernel() {
     # Remove kern.log from rsyslog since we're going to modify its settings
     sed -i 's!/var/log/kern.log!!g' /etc/logrotate.d/rsyslog
@@ -425,5 +444,6 @@ Choose any option: "
 }
 
 fn_update_os
+fn_check_for_newer_kernel
 fn_install_required_packages
 mainmenu
