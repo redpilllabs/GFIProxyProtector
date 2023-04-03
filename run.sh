@@ -11,6 +11,7 @@ RED="\033[31m"
 GREEN="\033[32m"
 B_RED="\033[1;31m"
 B_GREEN="\033[1;32m"
+B_YELLOW="\033[1;33m"
 # Access control
 BLOCK_IRAN_OUT_STATUS=""
 BLOCK_IRAN_OUT_STATUS_COLOR=$B_RED
@@ -83,7 +84,7 @@ function fn_check_for_newer_kernel() {
         available_kernels=$(apt-cache search linux-image | grep -oP '[0-9]\.[0-9]+\.[0-9]+-[0-9]+')
         for available_kernel in $available_kernels; do
             if [[ "$available_kernel" > "$kernel_version" ]]; then
-                echo -e "${B_YELLOW}There's a newer kernel available: $available_kernel${RESET}"
+                echo -e "${B_YELLOW}\n\nThere's a newer kernel available for your OS: $available_kernel${RESET}"
                 fn_install_required_packages linux-image-amd64
                 fn_install_required_packages linux-headers-amd64
                 echo -e "${B_RED}You need to reboot your server to load the new kernel and the extra moduels required${RESET}"
