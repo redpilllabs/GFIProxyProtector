@@ -84,9 +84,9 @@ function fn_check_for_newer_kernel() {
         available_kernels=$(apt-cache search linux-image | grep -oP '[0-9]\.[0-9]+\.[0-9]+-[0-9]+' | sort --version-sort)
         latest_kernel=$(echo "$available_kernels" | tail -n 1)
         if [[ "$latest_kernel" > "$current_kernel" ]]; then
-            echo -e "${B_YELLOW}\n\nThere's a newer kernel available for your OS: $available_kernel${RESET}"
             fn_check_and_install_pkg linux-image-$latest_kernel-amd64
             fn_check_and_install_pkg linux-headers-$latest_kernel-amd64
+            echo -e "${B_GREEN}\n\nThere's a newer kernel available for your OS: $available_kernel${RESET}"
             echo -e "${B_RED}You're server is now going to reboot to load the new kernel and the extra moduels required${RESET}"
             echo -e "${B_GREEN}After booting up, run the script again to proceed!${RESET}"
             systemctl reboot
