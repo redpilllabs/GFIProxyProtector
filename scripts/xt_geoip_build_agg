@@ -3,7 +3,7 @@
 #	Converter for aggregated CIDR CSV database to binary, for xt_geoip
 #	Copyright Jan Engelhardt, 2008-2011
 #	Copyright Philip Prindeville, 2018
-#	Copyright 0xNeu, 2023
+#	Copyright Kyochikuto, 2023
 #
 use Getopt::Long;
 use Net::CIDR::Lite;

@@ -196,7 +196,7 @@ function fn_rebuild_xt_geoip_database() {
 
         # Get the latest aggregated CIDR database
         echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
-        curl -s "https://raw.githubusercontent.com/0xNeu/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+        curl -s "https://raw.githubusercontent.com/redpilllabs/GFIGeoIP/main/Aggregated_Data/agg_cidrs.csv" >/tmp/agg_cidrs.csv
 
         # Check if it's the first run
         if [ -f "/usr/libexec/rainb0w/agg_cidr.csv" ]; then
@@ -399,12 +399,12 @@ function fn_print_header() {
     #############################################################
     #                                                           #
     #                GFI Proxy Server Protection                #
-    #                       Author: 0xNeu                       #
+    #                       Red Pill Labs                       #
     #                                                           #
     #      This is a subset of 'Rainb0w Proxy Installer'        #
-    #        available at [github.com/0xNeu/Rainb0w]            #
+    #        available at [github.com/redpilllabs/Rainb0w]            #
     #      and it utilizes the aggregated CIDR database         #
-    #        available at [github.com/0xNeu/GFIGeoIP]           #
+    #        available at [github.com/redpilllabs/GFIGeoIP]           #
     #                                                           #
     #############################################################
     "
