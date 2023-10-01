@@ -33,7 +33,7 @@ else
             exit 0
         fi
     elif [[ "$DISTRO" =~ "Debian GNU/Linux" ]]; then
-        if [ ! "$DISTRO_VERSION" == "11" ]; then
+        if [ ! "$DISTRO_VERSION" == "11" ] && [ ! "$DISTRO_VERSION" == "12" ]; then
             echo "Your version of Debian is not supported! Minimum required version is 11"
             exit 0
         fi
