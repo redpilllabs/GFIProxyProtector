@@ -129,6 +129,7 @@ function fn_install_xt_geoip_module() {
     fn_check_and_install_pkg xtables-addons-dkms
     fn_check_and_install_pkg xtables-addons-common
     fn_check_and_install_pkg libtext-csv-xs-perl
+    fn_check_and_install_pkg libnet-cidr-lite-perl
     fn_check_and_install_pkg libmoosex-types-netaddr-ip-perl
     fn_check_and_install_pkg pkg-config
     fn_check_and_install_pkg iptables-persistent
