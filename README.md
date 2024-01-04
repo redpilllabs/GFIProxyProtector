@@ -27,6 +27,7 @@
 ```
 apt install git
 git clone https://github.com/redpilllabs/GFIProxyProtector.git
+cd GFIProxyProtector
 ./run.sh
 ```
 
