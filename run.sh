@@ -15,9 +15,10 @@ B_YELLOW="\033[1;33m"
 # Access control
 BLOCK_IRAN_OUT_STATUS=""
 BLOCK_IRAN_OUT_STATUS_COLOR=$B_RED
-BLOCK_CHINA_IN_OUT_STATUS=""
-BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+BLOCK_OUTSIDERS_STATUS=""
+BLOCK_OUTSIDERS_STATUS_COLOR=$B_RED
 
+export DEBIAN_FRONTEND=noninteractive
 trap '' INT
 
 # OS check
@@ -72,7 +73,7 @@ function fn_update_os() {
 function fn_install_required_packages() {
     # Install pre-requisites
     echo -e "${B_GREEN}Checking for pre-required packages${RESET}"
-    pkgs=("kmod" "dialog" "apt-utils" "procps" "bc" "logrotate")
+    pkgs=("kmod" "dialog" "apt-utils" "procps" "bc" "logrotate" "net-tools")
     for pkg in ${pkgs[@]}; do
         fn_check_and_install_pkg "$pkg"
     done
@@ -197,7 +198,7 @@ function fn_rebuild_xt_geoip_database() {
 
         # Get the latest aggregated CIDR database
         echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
-        curl -Lf "https://github.com/redpilllabs/GFIGeoIP/releases/latest/download/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+        curl -LfsS "https://github.com/redpilllabs/GFIGeoIP/releases/latest/download/agg_cidrs.csv" >/tmp/agg_cidrs.csv
 
         # Check if it's the first run
         if [ -f "/usr/libexec/rainb0w/agg_cidr.csv" ]; then
@@ -228,17 +229,113 @@ function fn_rebuild_xt_geoip_database() {
     fi
 }
 
+function reset_firewall() {
+    echo -e "${B_GREEN}\n\nResetting iptables to default state... ${RESET}"
+    sleep 1
+
+    iptables -P INPUT ACCEPT
+    ip6tables -P INPUT ACCEPT
+    iptables -P FORWARD ACCEPT
+    ip6tables -P FORWARD ACCEPT
+    iptables -P OUTPUT ACCEPT
+    ip6tables -P OUTPUT ACCEPT
+    iptables -F
+    iptables -X
+    iptables -t nat -F
+    iptables -t nat -X
+    iptables -t mangle -F
+    iptables -t mangle -X
+    IS_DOCKER_INSTALLED=$(fn_check_for_pkg docker-ce)
+    if [ "$IS_DOCKER_INSTALLED" = true ]; then
+        systemctl restart docker
+    fi
+
+    iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+    ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+}
+
+function whitelist_necessary_ports() {
+    modprobe xt_geoip
+    local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
+    if [ ! -z "$IS_MODULE_LOADED" ]; then
+        echo -e "${B_GREEN}\n\nWhitelisting necessary ports ${RESET}"
+        sleep 1
+        SSH_PORT=$(netstat -tlnp | grep sshd | awk '{print $4}' | awk -F ':' '{print $2}')
+
+        # IPv4 rules
+        if ! iptables -L INPUT | grep "Allow established"; then
+            echo -e "${B_GREEN}>> Allow established inbound (IPv4) ${RESET}"
+            iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -m comment --comment "Allow established" -j ACCEPT
+            iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        fi
+        if ! iptables -L OUTPUT | grep "Allow established"; then
+            echo -e "${B_GREEN}>> Allow established outbound (IPv4) ${RESET}"
+            iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED -m comment --comment "Allow established" -j ACCEPT
+            iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        fi
+        if ! iptables -L INPUT | grep "Allow loopback"; then
+            echo -e "${B_GREEN}>> Allow ping to IPv4 ${RESET}"
+            iptables -A INPUT -i lo -m comment --comment "Allow loopback" -j ACCEPT
+            iptables -A INPUT ! -i lo -s 127.0.0.0/8 -j REJECT
+            iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        fi
+        if ! iptables -L INPUT | grep "Allow SSH"; then
+            echo -e "${B_GREEN}>> Allow SSH to port ${SSH_PORT} (IPv4) ${RESET}"
+            iptables -A INPUT -p tcp --dport $SSH_PORT -m comment --comment "Allow SSH" -j ACCEPT
+            iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        fi
+        if ! iptables -L INPUT | grep "Allow ping"; then
+            echo -e "${B_GREEN}>> Allow ping to IPv4 ${RESET}"
+            iptables -A INPUT -p icmp --icmp-type 8 -m conntrack --ctstate NEW -m comment --comment "Allow ping" -j ACCEPT
+            iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        fi
+
+        # IPv6 rules
+        if ! ip6tables -L INPUT | grep "Allow established"; then
+            echo -e "${B_GREEN}>> Allow established inbound (IPv6) ${RESET}"
+            ip6tables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -m comment --comment "Allow established" -j ACCEPT
+            ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+        fi
+        if ! ip6tables -L OUTPUT | grep "Allow established"; then
+            echo -e "${B_GREEN}>> Allow established outbound (IPv6) ${RESET}"
+            ip6tables -A OUTPUT -m conntrack --ctstate ESTABLISHED -m comment --comment "Allow established" -j ACCEPT
+            ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+        fi
+        if ! ip6tables -L INPUT | grep "Allow SSH"; then
+            echo -e "${B_GREEN}>> Allow SSH to port ${SSH_PORT} (IPv6) ${RESET}"
+            ip6tables -A INPUT -p tcp --dport $SSH_PORT -m comment --comment "Allow SSH" -j ACCEPT
+            ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+        fi
+        if ! ip6tables -L INPUT | grep "Allow ping"; then
+            echo -e "${B_GREEN}>> Allow ping to IPv6 ${RESET}"
+            ip6tables -A INPUT -p icmpv6 -m comment --comment "Allow ping" -j ACCEPT
+            ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+        fi
+        if ! iptables -L INPUT | grep "Allow loopback"; then
+            echo -e "${B_GREEN}>> Allow ping to IPv6 ${RESET}"
+            ip6tables -A INPUT -i lo -m comment --comment "Allow loopback" -j ACCEPT
+            ip6tables -A INPUT ! -i lo -s ::1/128 -j REJECT
+            ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+        fi
+
+    else
+        fn_install_xt_geoip_module
+    fi
+}
+
 function fn_block_outgoing_iran() {
     modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
+        whitelist_necessary_ports
+
         echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
         sleep 2
 
-        iptables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-        ip6tables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-        iptables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-        ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+        iptables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+        ip6tables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+        iptables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+        ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
 
         # Save and cleanup
         iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -252,10 +349,10 @@ function fn_unblock_outgoing_iran() {
     echo -e "${B_GREEN}\n\nUnblocking OUTGOING connections to Iran ${RESET}"
     sleep 2
 
-    iptables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-    ip6tables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-    iptables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
-    ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -j REJECT
+    iptables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+    ip6tables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+    iptables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+    ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
 
     # Save and cleanup
     iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -281,7 +378,7 @@ function fn_update_iran_outbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e '-m geoip --destination-country IR')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Reject outgoing to IR')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_IRAN_OUT_STATUS="ACTIVATED"
                 BLOCK_IRAN_OUT_STATUS_COLOR=$B_GREEN
@@ -299,25 +396,24 @@ function fn_update_iran_outbound_blocking_status() {
     fi
 }
 
-function fn_block_china_in_out() {
+function fn_block_outsiders() {
     modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
-        echo -e "${B_GREEN}\n\nBlocking connections to/from China ${RESET}"
-        sleep 2
+        whitelist_necessary_ports
 
-        # Drop connections to/from China
-        iptables -I INPUT -m geoip --src-cc CN -j DROP
-        ip6tables -I INPUT -m geoip --src-cc CN -j DROP
-        iptables -I FORWARD -m geoip --src-cc CN -j REJECT
-        ip6tables -I FORWARD -m geoip --src-cc CN -j REJECT
-        iptables -I FORWARD -m geoip --dst-cc CN -j REJECT
-        ip6tables -I FORWARD -m geoip --dst-cc CN -j REJECT
-        iptables -I OUTPUT -m geoip --dst-cc CN -j REJECT
-        ip6tables -I OUTPUT -m geoip --dst-cc CN -j REJECT
-        # Log any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-        iptables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
-        ip6tables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+        echo -e "${B_GREEN}\n\nBlocking incoming connections not originating from Iran or Cloudflare ${RESET}"
+        sleep 2
+        INTERFACE=$(ip route get 8.8.8.8 | awk '{print $5}')
+
+        # Log any connection attempts not from Iran/Cloudflare to '/var/log/kern.log' tagged with the prefix below
+        iptables -A INPUT -m geoip ! --src-cc IR,CF -m limit --limit 5/min -j LOG --log-prefix '** SUSPECT ** '
+        ip6tables -A INPUT -m geoip ! --src-cc IR,CF -m limit --limit 5/min -j LOG --log-prefix '** SUSPECT ** '
+        # Drop connections not from Iran/Cloudflare
+        iptables -A INPUT -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+        ip6tables -A INPUT -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+        iptables -I FORWARD -i $INTERFACE -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+        ip6tables -I FORWARD -i $INTERFACE -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
 
         # Save and cleanup
         iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -327,22 +423,16 @@ function fn_block_china_in_out() {
     fi
 }
 
-function fn_unblock_china_in_out() {
-    echo -e "${B_GREEN}\n\nUnblocking connections to/from China ${RESET}"
+function fn_unlock_outsiders() {
+    echo -e "${B_GREEN}\n\nUnblocking connections not originating from Iran or Cloudflare ${RESET}"
     sleep 2
 
-    # Disable logs from any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-    iptables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
-    ip6tables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
-    # Allow connections to/from China
-    iptables -D INPUT -m geoip --src-cc CN -j DROP
-    ip6tables -D INPUT -m geoip --src-cc CN -j DROP
-    iptables -D FORWARD -m geoip --src-cc CN -j REJECT
-    ip6tables -D FORWARD -m geoip --src-cc CN -j REJECT
-    iptables -D FORWARD -m geoip --dst-cc CN -j REJECT
-    ip6tables -D FORWARD -m geoip --dst-cc CN -j REJECT
-    iptables -D OUTPUT -m geoip --dst-cc CN -j REJECT
-    ip6tables -D OUTPUT -m geoip --dst-cc CN -j REJECT
+    iptables -D INPUT -m geoip ! --src-cc IR,CF -m limit --limit 5/min -j LOG --log-prefix '** SUSPECT ** '
+    ip6tables -D INPUT -m geoip ! --src-cc IR,CF -m limit --limit 5/min -j LOG --log-prefix '** SUSPECT ** '
+    iptables -D INPUT -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+    ip6tables -D INPUT -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+    iptables -D FORWARD -i $INTERFACE -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
+    ip6tables -D FORWARD -i $INTERFACE -m geoip ! --src-cc IR,CF -m conntrack --ctstate NEW -m comment --comment "Block outsiders" -j DROP
 
     # Save and cleanup
     iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -350,7 +440,7 @@ function fn_unblock_china_in_out() {
 }
 
 function fn_toggle_china_blocking() {
-    if [ "$BLOCK_CHINA_IN_OUT_STATUS" = "DEACTIVATED" ]; then
+    if [ "$BLOCK_OUTSIDERS_STATUS" = "DEACTIVATED" ]; then
         # Install xtables if not found already
         local IS_INSTALLED=$(fn_check_for_pkg xtables-addons-common)
         if [ "$IS_INSTALLED" = false ]; then
@@ -358,31 +448,31 @@ function fn_toggle_china_blocking() {
         fi
         fn_increase_connctrack_limit
         fn_rebuild_xt_geoip_database
-        fn_block_china_in_out
+        fn_block_outsiders
     else
-        fn_unblock_china_in_out
+        fn_unlock_outsiders
     fi
 }
 
-function fn_update_china_in_out_blocking_status() {
+function fn_update_outsiders_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e '-m geoip --source-country CN  -j DROP')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Block outsiders')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
-                BLOCK_CHINA_IN_OUT_STATUS="ACTIVATED"
-                BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_GREEN
+                BLOCK_OUTSIDERS_STATUS="ACTIVATED"
+                BLOCK_OUTSIDERS_STATUS_COLOR=$B_GREEN
             else
-                BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-                BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+                BLOCK_OUTSIDERS_STATUS="DEACTIVATED"
+                BLOCK_OUTSIDERS_STATUS_COLOR=$B_RED
             fi
         else
-            BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-            BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+            BLOCK_OUTSIDERS_STATUS="DEACTIVATED"
+            BLOCK_OUTSIDERS_STATUS_COLOR=$B_RED
         fi
     else
-        BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-        BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+        BLOCK_OUTSIDERS_STATUS="DEACTIVATED"
+        BLOCK_OUTSIDERS_STATUS_COLOR=$B_RED
     fi
 }
 
@@ -397,17 +487,17 @@ function fn_fail() {
 
 function fn_print_header() {
     echo -ne "
-    #############################################################
-    #                                                           #
-    #                GFI Proxy Server Protection                #
-    #                       Red Pill Labs                       #
-    #                                                           #
-    #      This is a subset of 'Rainb0w Proxy Installer'        #
-    #        available at [github.com/redpilllabs/Rainb0w]            #
-    #      and it utilizes the aggregated CIDR database         #
-    #        available at [github.com/redpilllabs/GFIGeoIP]           #
-    #                                                           #
-    #############################################################
+    #######################################################################
+    #                                                                     #
+    #                    GFI Proxy Server Protection                      #
+    #                           Red Pill Labs                             #
+    #                                                                     #
+    #          This is a subset of 'Rainb0w Proxy Installer'              #
+    #            available at [github.com/redpilllabs/Rainb0w]            #
+    #          and it utilizes the aggregated CIDR database               #
+    #            available at [github.com/redpilllabs/GFIGeoIP]           #
+    #                                                                     #
+    #######################################################################
     "
 }
 
@@ -415,17 +505,24 @@ function mainmenu() {
     fn_print_header
     # Check and update status variables
     fn_update_iran_outbound_blocking_status
-    fn_update_china_in_out_blocking_status
+    fn_update_outsiders_blocking_status
     # Display the menu
     echo -ne "
 
 ${GREEN}1)${RESET} Block OUTGOING connections to Iran:    ${BLOCK_IRAN_OUT_STATUS_COLOR}${BLOCK_IRAN_OUT_STATUS}${RESET}
-${GREEN}2)${RESET} Block ALL connections to/from China:   ${BLOCK_CHINA_IN_OUT_STATUS_COLOR}${BLOCK_CHINA_IN_OUT_STATUS}${RESET}
+${GREEN}2)${RESET} Block all INCOMING except from Iran / Cloudflare:   ${BLOCK_OUTSIDERS_STATUS_COLOR}${BLOCK_OUTSIDERS_STATUS}${RESET}
+${GREEN}3)${RESET} Reset Firewall Settings
 ${RED}0)${RESET} Exit
 
 Choose any option: "
     read -r ans
     case $ans in
+    3)
+        clear
+        reset_firewall
+        # clear
+        mainmenu
+        ;;
     2)
         clear
         fn_toggle_china_blocking
@@ -452,4 +549,6 @@ Choose any option: "
 fn_update_os
 fn_check_for_newer_kernel
 fn_install_required_packages
+fn_install_xt_geoip_module
+fn_rebuild_xt_geoip_database
 mainmenu
