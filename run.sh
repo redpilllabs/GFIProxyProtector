@@ -17,8 +17,8 @@ BLOCK_IRAN_OUT_STATUS=""
 BLOCK_IRAN_OUT_STATUS_COLOR=$B_RED
 BLOCK_OUTSIDERS_STATUS=""
 BLOCK_OUTSIDERS_STATUS_COLOR=$B_RED
-BLOCK_CHINA_IN_OUT_STATUS=""
-BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+BLOCK_CHINA_IN_STATUS=""
+BLOCK_CHINA_IN_STATUS_COLOR=$B_RED
 
 export DEBIAN_FRONTEND=noninteractive
 trap '' INT
@@ -344,13 +344,13 @@ function fn_block_outgoing_iran() {
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         whitelist_necessary_ports
 
-        echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran ${RESET}"
+        echo -e "${B_GREEN}\n\nBlocking OUTGOING connections to Iran / China ${RESET}"
         sleep 2
 
-        iptables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-        ip6tables -I FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-        iptables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-        ip6tables -A OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+        iptables -I FORWARD -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+        ip6tables -I FORWARD -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+        iptables -A OUTPUT -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+        ip6tables -A OUTPUT -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
 
         # Save and cleanup
         iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -361,13 +361,13 @@ function fn_block_outgoing_iran() {
 }
 
 function fn_unblock_outgoing_iran() {
-    echo -e "${B_GREEN}\n\nUnblocking OUTGOING connections to Iran ${RESET}"
+    echo -e "${B_GREEN}\n\nUnblocking OUTGOING connections to Iran / China ${RESET}"
     sleep 2
 
-    iptables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-    ip6tables -D FORWARD -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-    iptables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
-    ip6tables -D OUTPUT -m geoip --dst-cc IR -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR" -j REJECT
+    iptables -D FORWARD -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+    ip6tables -D FORWARD -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+    iptables -D OUTPUT -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
+    ip6tables -D OUTPUT -m geoip --dst-cc IR,CN -m conntrack --ctstate NEW -m comment --comment "Reject outgoing to IR,CN" -j REJECT
 
     # Save and cleanup
     iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -391,7 +391,7 @@ function fn_update_iran_outbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Reject outgoing to IR')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Reject outgoing to IR,CN')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_IRAN_OUT_STATUS="ACTIVATED"
                 BLOCK_IRAN_OUT_STATUS_COLOR=$B_GREEN
@@ -409,22 +409,16 @@ function fn_update_iran_outbound_blocking_status() {
     fi
 }
 
-function fn_block_china_in_out() {
+function fn_block_china_inbound() {
     modprobe xt_geoip
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
-        echo -e "${B_GREEN}\n\nBlocking connections to/from China ${RESET}"
+        echo -e "${B_GREEN}\n\nBlocking connections from China ${RESET}"
         sleep 2
 
         # Drop connections to/from China
         iptables -A INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
         ip6tables -A INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
-        iptables -A FORWARD -m geoip --src-cc CN -m comment --comment "Block China" -j REJECT
-        ip6tables -A FORWARD -m geoip --src-cc CN -m comment --comment "Block China" -j REJECT
-        iptables -A FORWARD -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-        ip6tables -A FORWARD -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-        iptables -A OUTPUT -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-        ip6tables -A OUTPUT -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
         # Log any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
         iptables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
         ip6tables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
@@ -437,8 +431,8 @@ function fn_block_china_in_out() {
     fi
 }
 
-function fn_unblock_china_in_out() {
-    echo -e "${B_GREEN}\n\nUnblocking connections to/from China ${RESET}"
+function fn_unblock_china_inbound() {
+    echo -e "${B_GREEN}\n\nUnblocking connections from China ${RESET}"
     sleep 2
 
     # Disable logs from any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
@@ -447,12 +441,6 @@ function fn_unblock_china_in_out() {
     # Allow connections to/from China
     iptables -D INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
     ip6tables -D INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
-    iptables -D FORWARD -m geoip --src-cc CN -m comment --comment "Block China" -j REJECT
-    ip6tables -D FORWARD -m geoip --src-cc CN -m comment --comment "Block China" -j REJECT
-    iptables -D FORWARD -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-    ip6tables -D FORWARD -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-    iptables -D OUTPUT -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
-    ip6tables -D OUTPUT -m geoip --dst-cc CN -m comment --comment "Block China" -j REJECT
 
     # Save and cleanup
     iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -465,41 +453,41 @@ function fn_toggle_china_blocking() {
         echo -e "Press any key to continue..."
         read -r
     else
-        if [ "$BLOCK_CHINA_IN_OUT_STATUS" = "DEACTIVATED" ]; then
+        if [ "$BLOCK_CHINA_IN_STATUS" = "DEACTIVATED" ]; then
             # Install xtables if not found already
             local IS_INSTALLED=$(fn_check_for_pkg xtables-addons-common)
             if [ "$IS_INSTALLED" = false ]; then
                 fn_install_xt_geoip_module
             fi
-            fn_block_china_in_out
+            fn_block_china_inbound
         else
-            fn_unblock_china_in_out
+            fn_unblock_china_inbound
         fi
     fi
 }
 
-function fn_update_china_in_out_blocking_status() {
+function fn_update_china_inbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
             local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Block China')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
-                BLOCK_CHINA_IN_OUT_STATUS="ACTIVATED"
-                BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_GREEN
+                BLOCK_CHINA_IN_STATUS="ACTIVATED"
+                BLOCK_CHINA_IN_STATUS_COLOR=$B_GREEN
             elif [ "$(cat /etc/iptables/rules.v4 | grep -e 'Block outsiders')" ]; then
-                BLOCK_CHINA_IN_OUT_STATUS="COVERED"
-                BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_GREEN
+                BLOCK_CHINA_IN_STATUS="COVERED"
+                BLOCK_CHINA_IN_STATUS_COLOR=$B_GREEN
             else
-                BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-                BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+                BLOCK_CHINA_IN_STATUS="DEACTIVATED"
+                BLOCK_CHINA_IN_STATUS_COLOR=$B_RED
             fi
         else
-            BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-            BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+            BLOCK_CHINA_IN_STATUS="DEACTIVATED"
+            BLOCK_CHINA_IN_STATUS_COLOR=$B_RED
         fi
     else
-        BLOCK_CHINA_IN_OUT_STATUS="DEACTIVATED"
-        BLOCK_CHINA_IN_OUT_STATUS_COLOR=$B_RED
+        BLOCK_CHINA_IN_STATUS="DEACTIVATED"
+        BLOCK_CHINA_IN_STATUS_COLOR=$B_RED
     fi
 }
 
@@ -554,8 +542,8 @@ function fn_toggle_outsiders_blocking() {
         response_lc=$(echo "$response" | tr '[:upper:]' '[:lower:]')
 
         if [[ "$response_lc" == "y" || "$response_lc" == "yes" ]]; then
-            if [ "$BLOCK_CHINA_IN_OUT_STATUS" = "ACTIVATED" ]; then
-                fn_unblock_china_in_out
+            if [ "$BLOCK_CHINA_IN_STATUS" = "ACTIVATED" ]; then
+                fn_unblock_china_inbound
             fi
             # Install xtables if not found already
             local IS_INSTALLED=$(fn_check_for_pkg xtables-addons-common)
@@ -621,13 +609,13 @@ function mainmenu() {
     fn_print_header
     # Check and update status variables
     fn_update_iran_outbound_blocking_status
-    fn_update_china_in_out_blocking_status
+    fn_update_china_inbound_blocking_status
     fn_update_outsiders_blocking_status
     # Display the menu
     echo -ne "
 
-${GREEN}1)${RESET} Block OUTGOING connections to Iran:    ${BLOCK_IRAN_OUT_STATUS_COLOR}${BLOCK_IRAN_OUT_STATUS}${RESET}
-${GREEN}2)${RESET} Block ALL connections to/from China:   ${BLOCK_CHINA_IN_OUT_STATUS_COLOR}${BLOCK_CHINA_IN_OUT_STATUS}${RESET}
+${GREEN}1)${RESET} Block OUTGOING connections to Iran / China:    ${BLOCK_IRAN_OUT_STATUS_COLOR}${BLOCK_IRAN_OUT_STATUS}${RESET}
+${GREEN}2)${RESET} Block INCOMING connections from China:   ${BLOCK_CHINA_IN_STATUS_COLOR}${BLOCK_CHINA_IN_STATUS}${RESET}
 ${GREEN}3)${RESET} Block ALL INCOMING except from Iran / Cloudflare:   ${BLOCK_OUTSIDERS_STATUS_COLOR}${BLOCK_OUTSIDERS_STATUS}${RESET}
 ${GREEN}4)${RESET} Update IP database
 ${GREEN}5)${RESET} Reset Firewall Settings
