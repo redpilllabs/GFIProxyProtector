@@ -232,28 +232,38 @@ function fn_rebuild_xt_geoip_database() {
 }
 
 function reset_firewall() {
-    echo -e "${B_GREEN}\n\nResetting iptables to default state... ${RESET}"
-    sleep 1
+    echo -e "\n\n${B_YELLOW}WARNING:${RESET} This will ERASE your iptables settings!\n"
+    read -rp "Do you want to continue? (yes/NO): " response
+    response=${response:-no}
+    response_lc=$(echo "$response" | tr '[:upper:]' '[:lower:]')
 
-    iptables -P INPUT ACCEPT
-    ip6tables -P INPUT ACCEPT
-    iptables -P FORWARD ACCEPT
-    ip6tables -P FORWARD ACCEPT
-    iptables -P OUTPUT ACCEPT
-    ip6tables -P OUTPUT ACCEPT
-    iptables -F
-    iptables -X
-    iptables -t nat -F
-    iptables -t nat -X
-    iptables -t mangle -F
-    iptables -t mangle -X
-    IS_DOCKER_INSTALLED=$(fn_check_for_pkg docker-ce)
-    if [ "$IS_DOCKER_INSTALLED" = true ]; then
-        systemctl restart docker
+    if [[ "$response_lc" == "y" || "$response_lc" == "yes" ]]; then
+        echo -e "${B_GREEN}\n\nResetting iptables to default state... ${RESET}"
+        sleep 1
+
+        iptables -P INPUT ACCEPT
+        ip6tables -P INPUT ACCEPT
+        iptables -P FORWARD ACCEPT
+        ip6tables -P FORWARD ACCEPT
+        iptables -P OUTPUT ACCEPT
+        ip6tables -P OUTPUT ACCEPT
+        iptables -F
+        iptables -X
+        iptables -t nat -F
+        iptables -t nat -X
+        iptables -t mangle -F
+        iptables -t mangle -X
+        IS_DOCKER_INSTALLED=$(fn_check_for_pkg docker-ce)
+        if [ "$IS_DOCKER_INSTALLED" = true ]; then
+            systemctl restart docker
+        fi
+
+        iptables-save | tee /etc/iptables/rules.v4 >/dev/null
+        ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
+    else
+        echo "Leaving the settings as is..."
     fi
 
-    iptables-save | tee /etc/iptables/rules.v4 >/dev/null
-    ip6tables-save | tee /etc/iptables/rules.v6 >/dev/null
 }
 
 function whitelist_necessary_ports() {
@@ -539,17 +549,25 @@ function fn_unlock_outsiders() {
 
 function fn_toggle_outsiders_blocking() {
     if [ "$BLOCK_OUTSIDERS_STATUS" = "DEACTIVATED" ]; then
-        if [ "$BLOCK_CHINA_IN_OUT_STATUS" = "ACTIVATED" ]; then
-            fn_unblock_china_in_out
+        echo -e "\n\n${B_YELLOW}WARNING:${RESET} This will break TLS certificate creation/renewal and you'd have to manually disable this and renew your certs when necessary!\n"
+        read -rp "Do you want to continue? (yes/NO): " response
+        response=${response:-no}
+        response_lc=$(echo "$response" | tr '[:upper:]' '[:lower:]')
+
+        if [[ "$response_lc" == "y" || "$response_lc" == "yes" ]]; then
+            if [ "$BLOCK_CHINA_IN_OUT_STATUS" = "ACTIVATED" ]; then
+                fn_unblock_china_in_out
+            fi
+            # Install xtables if not found already
+            local IS_INSTALLED=$(fn_check_for_pkg xtables-addons-common)
+            if [ "$IS_INSTALLED" = false ]; then
+                fn_install_xt_geoip_module
+            fi
+            fn_increase_connctrack_limit
+            fn_rebuild_xt_geoip_database
+            fn_block_outsiders
         fi
-        # Install xtables if not found already
-        local IS_INSTALLED=$(fn_check_for_pkg xtables-addons-common)
-        if [ "$IS_INSTALLED" = false ]; then
-            fn_install_xt_geoip_module
-        fi
-        fn_increase_connctrack_limit
-        fn_rebuild_xt_geoip_database
-        fn_block_outsiders
+
     else
         fn_unlock_outsiders
     fi
