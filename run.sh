@@ -184,6 +184,37 @@ function fn_increase_connctrack_limit() {
     fi
 }
 
+function get_latest_db() {
+    # Get the latest aggregated CIDR database
+    echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
+    curl -LfsS "https://github.com/redpilllabs/GFIGeoIP/releases/latest/download/agg_cidrs.csv" >/tmp/agg_cidrs.csv
+
+    # Check if it's the first run
+    if [ -f "/usr/libexec/rainb0w/agg_cidr.csv" ]; then
+        # Check if it is newer than what we already have
+        if cmp -s /usr/libexec/rainb0w/agg_cidr.csv /tmp/agg_cidrs.csv; then
+            echo -e "${B_GREEN}Already on the latest database! ${RESET}"
+            rm /tmp/agg_cidrs.csv
+        else
+            mv /tmp/agg_cidrs.csv /usr/libexec/rainb0w/agg_cidrs.csv
+            # Convert CSV database to binary format for xt_geoip
+            echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
+            /usr/libexec/rainb0w/xt_geoip_build_agg -s -i /usr/libexec/rainb0w/agg_cidrs.csv
+            # Load xt_geoip kernel module
+            modprobe xt_geoip
+            lsmod | grep ^xt_geoip
+        fi
+    else
+        mv /tmp/agg_cidrs.csv /usr/libexec/rainb0w/agg_cidrs.csv
+        # Convert CSV database to binary format for xt_geoip
+        echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
+        /usr/libexec/rainb0w/xt_geoip_build_agg -s -i /usr/libexec/rainb0w/agg_cidrs.csv
+        # Load xt_geoip kernel module
+        modprobe xt_geoip
+        lsmod | grep ^xt_geoip
+    fi
+}
+
 function fn_rebuild_xt_geoip_database() {
     if [ "$(fn_check_for_pkg xtables-addons-common)" = true ] &&
         [ "$(fn_check_for_pkg libtext-csv-xs-perl)" = true ]; then
@@ -198,34 +229,7 @@ function fn_rebuild_xt_geoip_database() {
         cp $PWD/scripts/xt_geoip_build_agg /usr/libexec/rainb0w/xt_geoip_build_agg
         chmod +x /usr/libexec/rainb0w/xt_geoip_build_agg
 
-        # Get the latest aggregated CIDR database
-        echo -e "${B_GREEN}Getting the latest aggregated database ${RESET}"
-        curl -LfsS "https://github.com/redpilllabs/GFIGeoIP/releases/latest/download/agg_cidrs.csv" >/tmp/agg_cidrs.csv
-
-        # Check if it's the first run
-        if [ -f "/usr/libexec/rainb0w/agg_cidr.csv" ]; then
-            # Check if it is newer than what we already have
-            if cmp -s /usr/libexec/rainb0w/agg_cidr.csv /tmp/agg_cidrs.csv; then
-                echo -e "${B_GREEN}Already on the latest database! ${RESET}"
-                rm /tmp/agg_cidrs.csv
-            else
-                mv /tmp/agg_cidrs.csv /usr/libexec/rainb0w/agg_cidrs.csv
-                # Convert CSV database to binary format for xt_geoip
-                echo -e "${B_GREEN}Newer aggregated CIDR database found, updating now... ${RESET}"
-                /usr/libexec/rainb0w/xt_geoip_build_agg -s -i /usr/libexec/rainb0w/agg_cidrs.csv
-                # Load xt_geoip kernel module
-                modprobe xt_geoip
-                lsmod | grep ^xt_geoip
-            fi
-        else
-            mv /tmp/agg_cidrs.csv /usr/libexec/rainb0w/agg_cidrs.csv
-            # Convert CSV database to binary format for xt_geoip
-            echo -e "${B_GREEN}Converting the CIDR database to binary format... ${RESET}"
-            /usr/libexec/rainb0w/xt_geoip_build_agg -s -i /usr/libexec/rainb0w/agg_cidrs.csv
-            # Load xt_geoip kernel module
-            modprobe xt_geoip
-            lsmod | grep ^xt_geoip
-        fi
+        get_latest_db
     else
         fn_install_xt_geoip_module
     fi
@@ -263,7 +267,6 @@ function reset_firewall() {
     else
         echo "Leaving the settings as is..."
     fi
-
 }
 
 function whitelist_necessary_ports() {
@@ -378,8 +381,6 @@ function fn_toggle_iran_outbound_blocking() {
         if [ "$IS_INSTALLED" = false ]; then
             fn_install_xt_geoip_module
         fi
-        fn_increase_connctrack_limit
-        fn_rebuild_xt_geoip_database
         fn_block_outgoing_iran
     else
         fn_unblock_outgoing_iran
@@ -470,8 +471,6 @@ function fn_toggle_china_blocking() {
             if [ "$IS_INSTALLED" = false ]; then
                 fn_install_xt_geoip_module
             fi
-            fn_increase_connctrack_limit
-            fn_rebuild_xt_geoip_database
             fn_block_china_in_out
         else
             fn_unblock_china_in_out
@@ -563,8 +562,6 @@ function fn_toggle_outsiders_blocking() {
             if [ "$IS_INSTALLED" = false ]; then
                 fn_install_xt_geoip_module
             fi
-            fn_increase_connctrack_limit
-            fn_rebuild_xt_geoip_database
             fn_block_outsiders
         fi
 
@@ -632,15 +629,22 @@ function mainmenu() {
 ${GREEN}1)${RESET} Block OUTGOING connections to Iran:    ${BLOCK_IRAN_OUT_STATUS_COLOR}${BLOCK_IRAN_OUT_STATUS}${RESET}
 ${GREEN}2)${RESET} Block ALL connections to/from China:   ${BLOCK_CHINA_IN_OUT_STATUS_COLOR}${BLOCK_CHINA_IN_OUT_STATUS}${RESET}
 ${GREEN}3)${RESET} Block ALL INCOMING except from Iran / Cloudflare:   ${BLOCK_OUTSIDERS_STATUS_COLOR}${BLOCK_OUTSIDERS_STATUS}${RESET}
-${GREEN}4)${RESET} Reset Firewall Settings
+${GREEN}4)${RESET} Update IP database
+${GREEN}5)${RESET} Reset Firewall Settings
 ${RED}0)${RESET} Exit
 
 Choose any option: "
     read -r ans
     case $ans in
-    4)
+    5)
         clear
         reset_firewall
+        # clear
+        mainmenu
+        ;;
+    4)
+        clear
+        get_latest_db
         # clear
         mainmenu
         ;;
@@ -678,4 +682,5 @@ fn_check_for_newer_kernel
 fn_install_required_packages
 fn_install_xt_geoip_module
 fn_rebuild_xt_geoip_database
+fn_increase_connctrack_limit
 mainmenu
