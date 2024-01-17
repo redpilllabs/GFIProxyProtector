@@ -12,7 +12,7 @@ if [ "$(lsmod | grep ^xt_geoip)" ]; then
     curl -Lf "https://github.com/redpilllabs/GFIGeoIP/releases/latest/download/agg_cidrs.csv" >/tmp/agg_cidrs.csv
 
     # Check if it is newer than what we already have
-    if cmp -s /usr/libexec/rainb0w/agg_cidr.csv /tmp/agg_cidrs.csv; then
+    if cmp -s /usr/libexec/rainb0w/agg_cidrs.csv /tmp/agg_cidrs.csv; then
         echo -e "${B_GREEN}Already on the latest database! ${RESET}"
         rm /tmp/agg_cidrs.csv
     else
