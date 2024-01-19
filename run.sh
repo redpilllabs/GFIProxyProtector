@@ -417,11 +417,11 @@ function fn_block_china_inbound() {
         sleep 2
 
         # Drop connections to/from China
-        iptables -A INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
-        ip6tables -A INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
+        iptables -A INPUT -m geoip --src-cc CN,RU -m comment --comment "Block China and Russia" -j DROP
+        ip6tables -A INPUT -m geoip --src-cc CN,RU -m comment --comment "Block China and Russia" -j DROP
         # Log any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-        iptables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
-        ip6tables -I INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+        iptables -I INPUT -m geoip --src-cc CN,RU -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+        ip6tables -I INPUT -m geoip --src-cc CN,RU -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
 
         # Save and cleanup
         iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -436,11 +436,11 @@ function fn_unblock_china_inbound() {
     sleep 2
 
     # Disable logs from any connection attempts originating from China to '/var/log/kern.log' tagged with the prefix below
-    iptables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
-    ip6tables -D INPUT -m geoip --src-cc CN -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+    iptables -D INPUT -m geoip --src-cc CN,RU -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
+    ip6tables -D INPUT -m geoip --src-cc CN,RU -m limit --limit 5/min -j LOG --log-prefix ' ** GFW ** '
     # Allow connections to/from China
-    iptables -D INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
-    ip6tables -D INPUT -m geoip --src-cc CN -m comment --comment "Block China" -j DROP
+    iptables -D INPUT -m geoip --src-cc CN,RU -m comment --comment "Block China and Russia" -j DROP
+    ip6tables -D INPUT -m geoip --src-cc CN,RU -m comment --comment "Block China and Russia" -j DROP
 
     # Save and cleanup
     iptables-save | tee /etc/iptables/rules.v4 >/dev/null
@@ -470,7 +470,7 @@ function fn_update_china_inbound_blocking_status() {
     local IS_MODULE_LOADED=$(lsmod | grep ^xt_geoip)
     if [ ! -z "$IS_MODULE_LOADED" ]; then
         if [ -f "/etc/iptables/rules.v4" ]; then
-            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Block China')
+            local IS_IPTABLES_CONFIGURED=$(cat /etc/iptables/rules.v4 | grep -e 'Block China and Russia')
             if [ "${IS_IPTABLES_CONFIGURED}" ]; then
                 BLOCK_CHINA_IN_STATUS="ACTIVATED"
                 BLOCK_CHINA_IN_STATUS_COLOR=$B_GREEN
@@ -615,7 +615,7 @@ function mainmenu() {
     echo -ne "
 
 ${GREEN}1)${RESET} Block OUTGOING connections to Iran / China:    ${BLOCK_IRAN_OUT_STATUS_COLOR}${BLOCK_IRAN_OUT_STATUS}${RESET}
-${GREEN}2)${RESET} Block INCOMING connections from China:   ${BLOCK_CHINA_IN_STATUS_COLOR}${BLOCK_CHINA_IN_STATUS}${RESET}
+${GREEN}2)${RESET} Block INCOMING connections from China / Russia:   ${BLOCK_CHINA_IN_STATUS_COLOR}${BLOCK_CHINA_IN_STATUS}${RESET}
 ${GREEN}3)${RESET} Block ALL INCOMING except from Iran / Cloudflare:   ${BLOCK_OUTSIDERS_STATUS_COLOR}${BLOCK_OUTSIDERS_STATUS}${RESET}
 ${GREEN}4)${RESET} Update IP database
 ${GREEN}5)${RESET} Reset Firewall Settings
